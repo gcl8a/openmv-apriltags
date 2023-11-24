@@ -1,4 +1,5 @@
 #include <openmv.h>
+#include <SPI.h>
 
 uint8_t OpenMV::getTagCountI2C(void)
 {
