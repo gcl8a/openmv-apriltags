@@ -1,6 +1,6 @@
 #include <openmv.h>
 
-uint8_t OpenMV::getTagCount(void)
+uint8_t OpenMV::getTagCountI2C(void)
 {
     uint8_t tagCount = 0;
 
@@ -15,7 +15,27 @@ uint8_t OpenMV::getTagCount(void)
     return tagCount;
 }
 
-bool OpenMV::readTag(AprilTagDatum& tag)
+uint8_t OpenMV::getTagCountSPI(void)
+{
+    uint8_t tagCount = 0;
+
+    delayMicroseconds(100); // Give camera time to get ready
+
+    /* Ask for one byte, which should hold the tag count
+     * We should probably check to make sure we don't accidenally read a tag.
+     * All tags start with 0xAA55, so if we get 0x55, then we should throw an error...someday...
+     */
+
+    digitalWrite(SS, LOW); // enable Slave Select
+
+    tagCount = SPI.transfer(tagCount);
+
+    digitalWrite(SS, HIGH); // disable Slave Select
+
+    return tagCount;
+}
+
+bool OpenMV::readTagI2C(AprilTagDatum& tag)
 {
     bool retVal = false;
 
@@ -46,6 +66,71 @@ bool OpenMV::readTag(AprilTagDatum& tag)
 
     return retVal;
 }
+
+bool OpenMV::readTagSPI(AprilTagDatum& tag)
+{
+    bool retVal = false;
+
+    /*
+     * Here we have to give the camera a little time to get ready. It needs to load
+     * any tag data into its queue. 100us is hit-and-miss; 200us is reliable; we use
+     * 250us here for extra "safety". Tested at "full speed", the camera takes ~50ms
+     * to detect a tag, so if you're not getting reliable tag reading, try upping this
+     * value.
+     */
+
+    delayMicroseconds(250); // Give camera a little time to get ready
+
+    uint8_t buffer[sizeof(AprilTagDatum)];
+
+    digitalWrite(SS, LOW); // select camera
+
+    for(uint8_t i = 0; i < sizeof(AprilTagDatum); i++) buffer[i] = SPI.transfer(i);
+
+    digitalWrite(SS, HIGH); // deselect camera
+
+    // for(uint8_t i = 0; i < sizeof(AprilTagDatum); i++) Serial.print(buffer[i], HEX);
+
+    memcpy(&tag, buffer, sizeof(AprilTagDatum));
+
+    //TODO: add basic error checking, including checksum
+
+    retVal = true;
+    
+    return retVal;
+}
+
+// bool OpenMV::readTag(AprilTagDatum& tag)
+// {
+//     bool retVal = false;
+
+//     //Wire.begin();
+//     //Wire.setClock(100000ul);
+
+//     /*
+//      * Here we have to give the camera a little time to get ready. It needs to load
+//      * any tag data into its queue. 100us is hit-and-miss; 200us is reliable; we use
+//      * 250us here for extra "safety". Tested at "full speed", the camera takes ~50ms
+//      * to detect a tag, so if you're not getting reliable tag reading, try upping this
+//      * value.
+//      */
+
+//     delayMicroseconds(250); // Give camera a little time to get ready
+
+//     uint8_t buffer[sizeof(AprilTagDatum)];
+//     //use some explicit casts to suppress warnings
+//     if (Wire.requestFrom(CAMERA_I2C_ADDRESS, sizeof(AprilTagDatum), true) == sizeof(AprilTagDatum))
+//     {
+//       for(uint8_t i = 0; i < sizeof(AprilTagDatum); i++) buffer[i] = Wire.read();
+//       memcpy(&tag, buffer, sizeof(AprilTagDatum));
+
+//       //TODO: add basic error checking, including checksum
+
+//       retVal = true;
+//     }
+
+//     return retVal;
+// }
 
 bool OpenMV::checkUART(AprilTagDatum& tag)  
 {

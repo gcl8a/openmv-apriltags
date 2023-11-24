@@ -17,8 +17,11 @@ protected:
     uint8_t mvIndex = 0; //for counting bytes
 
 public:
-    uint8_t getTagCount(void);
-    bool readTag(AprilTagDatum& tag);
+    uint8_t getTagCountI2C(void);
+    bool readTagI2C(AprilTagDatum& tag);
+
+    uint8_t getTagCountSPI(void);
+    bool readTagSPI(AprilTagDatum& tag);
 
     bool checkUART(AprilTagDatum& tag);
     bool handleUART(uint8_t b);

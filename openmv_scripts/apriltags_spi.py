@@ -26,7 +26,46 @@ max_blocks_per_id = 255
 # Plan is to make it report back the number
 ###
 
-import image, math, pyb, sensor, rpc, struct, time
+import image, math, pyb, sensor, struct, time
+from rpc import rpc_slave
+
+class rpc_spi_peripheral(rpc_slave):
+    def __init__(self, cs_pin="P3", clk_polarity=0, clk_phase=0, spi_bus=2):  # private
+        self.__pin = pyb.Pin(cs_pin, mode = pyb.Pin.IN, pull = pyb.Pin.PULL_UP)
+        self.__polarity = clk_polarity
+        self.__clk_phase = clk_phase
+        self.__spi = pyb.SPI(spi_bus)
+        rpc_slave.__init__(self)
+        self._stream_writer_queue_depth_max = 1
+
+    def get_bytes(self, buff, timeout_ms):  # protected
+        self._get_short_timeout = self._get_short_timeout_reset
+        start = pyb.millis()
+        while self.__pin.value():
+            if pyb.elapsed_millis(start) >= self._get_short_timeout:
+                return None
+        self.__spi.init(pyb.SPI.SLAVE, polarity=self.__polarity, phase=self.__clk_phase)
+        try:
+            self.__spi.send_recv(buff, buff, timeout=timeout_ms)  # SPI.recv() is broken.
+        except OSError:
+            buff = None
+        self.__spi.deinit()
+        return buff
+
+    def put_bytes(self, data, timeout_ms):  # protected
+        self._put_short_timeout = self._put_short_timeout_reset
+        start = pyb.millis()
+        while self.__pin.value():
+            if pyb.elapsed_millis(start) >= self._put_short_timeout:
+                return
+        self.__spi.init(pyb.SPI.SLAVE, polarity=self.__polarity, phase=self.__clk_phase)
+        try:
+            self.__spi.send(data, timeout=timeout_ms)
+        except OSError:
+            pass
+        self.__spi.deinit()
+
+
 
 # Camera Setup
 
@@ -37,9 +76,7 @@ sensor.skip_frames(time = 1000)
 
 # Link Setup
 
-interface = rpc.rpc_spi_slave()
-dat_buf = struct.pack("<b", 0)
-interface.put_bytes(dat_buf, timeout_ms = 200)
+interface = rpc_spi_peripheral()
 
 # Helper Stuff
 
@@ -78,7 +115,7 @@ while(True):
 
             # dat_buf += struct.pack("<h", 0x0000)
             # write(dat_buf) # write all data in one packet...
-#            interface.put_bytes(dat_buf, timeout_ms = 200)
+            interface.put_bytes(dat_buf, timeout_ms = 200)
 
     num_tags = min(len(tags), max_blocks)
     print("%d tags(s) found - FPS %f" % (num_tags, clock.fps()))
