@@ -1,5 +1,5 @@
 #include <openmv.h>
-#include <SPI.h>
+#include <MSPIM.h>
 
 uint8_t OpenMV::getTagCountI2C(void)
 {
@@ -16,7 +16,7 @@ uint8_t OpenMV::getTagCountI2C(void)
     return tagCount;
 }
 
-uint8_t OpenMV::getTagCountSPI(void)
+uint8_t OpenMV::getTagCountMSPI(void)
 {
     uint8_t tagCount = 0;
 
@@ -27,11 +27,23 @@ uint8_t OpenMV::getTagCountSPI(void)
      * All tags start with 0xAA55, so if we get 0x55, then we should throw an error...someday...
      */
 
-    digitalWrite(SS, LOW); // enable Slave Select
+    tagCount = mSPI.TransferByte(0);//, CS_MV);
 
-    tagCount = SPI.transfer(tagCount);
+    return tagCount;
+}
 
-    digitalWrite(SS, HIGH); // disable Slave Select
+uint8_t OpenMV::getTagCountSPI(void)
+{
+    uint8_t tagCount = 0;
+
+    /* Ask for one byte, which should hold the tag count
+     * We should probably check to make sure we don't accidenally read a tag.
+     * All tags start with 0xAA55, so if we get 0x55, then we should throw an error...someday...
+     */
+
+    digitalWrite(SS, LOW);
+    tagCount = SPI.transfer(0);//, CS_MV);
+    digitalWrite(SS, HIGH);
 
     return tagCount;
 }
@@ -68,6 +80,35 @@ bool OpenMV::readTagI2C(AprilTagDatum& tag)
     return retVal;
 }
 
+bool OpenMV::readTagMSPI(AprilTagDatum& tag)
+{
+    bool retVal = false;
+
+    /*
+     * Here we have to give the camera a little time to get ready. It needs to load
+     * any tag data into its queue. 100us is hit-and-miss; 200us is reliable; we use
+     * 250us here for extra "safety". Tested at "full speed", the camera takes ~50ms
+     * to detect a tag, so if you're not getting reliable tag reading, try upping this
+     * value.
+     */
+
+    delayMicroseconds(250); // Give camera a little time to get ready
+
+    uint8_t buffer[sizeof(AprilTagDatum)];
+
+    mSPI.Transfer(buffer, sizeof(AprilTagDatum), CS_MV);
+
+    for(uint8_t i = 0; i < sizeof(AprilTagDatum); i++) Serial.print(buffer[i], HEX);
+
+    memcpy(&tag, buffer, sizeof(AprilTagDatum));
+
+    //TODO: add basic error checking, including checksum
+
+    retVal = true;
+    
+    return retVal;
+}
+
 bool OpenMV::readTagSPI(AprilTagDatum& tag)
 {
     bool retVal = false;
@@ -84,13 +125,16 @@ bool OpenMV::readTagSPI(AprilTagDatum& tag)
 
     uint8_t buffer[sizeof(AprilTagDatum)];
 
-    digitalWrite(SS, LOW); // select camera
+    digitalWrite(SS, LOW);
 
-    for(uint8_t i = 0; i < sizeof(AprilTagDatum); i++) buffer[i] = SPI.transfer(i);
+    for(uint8_t i = 0; i < sizeof(AprilTagDatum); i++)
+    {
+      buffer[i] = SPI.transfer(buffer[i]);
+    }
 
-    digitalWrite(SS, HIGH); // deselect camera
+    digitalWrite(SS, HIGH);
 
-    // for(uint8_t i = 0; i < sizeof(AprilTagDatum); i++) Serial.print(buffer[i], HEX);
+    for(uint8_t i = 0; i < sizeof(AprilTagDatum); i++) Serial.print(buffer[i], HEX);
 
     memcpy(&tag, buffer, sizeof(AprilTagDatum));
 
@@ -100,6 +144,7 @@ bool OpenMV::readTagSPI(AprilTagDatum& tag)
     
     return retVal;
 }
+
 
 // bool OpenMV::readTag(AprilTagDatum& tag)
 // {

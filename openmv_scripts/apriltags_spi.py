@@ -59,12 +59,12 @@ class rpc_spi_peripheral(rpc_slave):
             if pyb.elapsed_millis(start) >= self._put_short_timeout:
                 return
         self.__spi.init(pyb.SPI.SLAVE, polarity=self.__polarity, phase=self.__clk_phase)
+
         try:
             self.__spi.send(data, timeout=timeout_ms)
         except OSError:
             pass
         self.__spi.deinit()
-
 
 
 # Camera Setup

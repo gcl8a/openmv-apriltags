@@ -6,6 +6,8 @@
 
 #define CAMERA_I2C_ADDRESS 0x12
 
+#define CS_MV 15
+
 #include <apriltagdatum.h>
 
 class Camera {};
@@ -22,6 +24,9 @@ public:
 
     uint8_t getTagCountSPI(void);
     bool readTagSPI(AprilTagDatum& tag);
+
+    uint8_t getTagCountMSPI(void);
+    bool readTagMSPI(AprilTagDatum& tag);
 
     bool checkUART(AprilTagDatum& tag);
     bool handleUART(uint8_t b);
