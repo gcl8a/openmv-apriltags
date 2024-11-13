@@ -39,7 +39,6 @@ sensor.skip_frames(time = 2000)
 
 # Link Setup
 
-#bus = pyb.I2C(2, pyb.I2C.SLAVE, addr = i2c_address)
 interface = rpc.rpc_i2c_slave(slave_addr=0x12)
 
 # Helper Stuff
@@ -51,8 +50,8 @@ def checksum(data):
     return checksum & 0xFFFF
 
 def to_object_block_format(tag):
-    angle = int((tag.rotation() * 180) / math.pi)
-    temp = struct.pack("<hhhhhh", tag.id(), tag.cx(), tag.cy(), tag.w(), tag.h(), angle)
+    angle = int((tag.rotation * 180) / math.pi)
+    temp = struct.pack("<hhhhhh", tag.id, tag.cx, tag.cy, tag.w, tag.h, angle)
     return struct.pack("<hh12s", 0xAA56, checksum(temp), temp)
 
 # Main Loop
@@ -61,7 +60,7 @@ clock = time.clock()
 while(True):
     clock.tick()
     img = sensor.snapshot()
-    tags = img.find_apriltags(families=image.TAG16H5) # default TAG16H5 family
+    tags = img.find_apriltags(families=image.TAG36H11) # default TAG16H5 family
 
     # Transmit Tags #
 
@@ -72,11 +71,11 @@ while(True):
         # dat_buf = struct.pack("<h", 0xAA55)
 
         # sort biggest to smallest
-        for tag in sorted(tags, key = lambda x: x.h() * x.w(), reverse = True)[0:max_blocks]:
+        for tag in sorted(tags, key = lambda x: x.h * x.w, reverse = True)[0:max_blocks]:
 
             dat_buf = to_object_block_format(tag)
-            img.draw_rectangle(tag.rect())
-            img.draw_cross(tag.cx(), tag.cy())
+            img.draw_rectangle(tag.rect)
+            img.draw_cross(tag.cx, tag.cy)
 
             # dat_buf += struct.pack("<h", 0x0000)
             # write(dat_buf) # write all data in one packet...
